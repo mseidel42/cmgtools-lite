@@ -16,7 +16,7 @@ class EventRecoilProducer(Analyzer):
 
         self.ptThr=0.5
         self.pvflag=ROOT.pat.PackedCandidate.PVTight
-        self.metFlavours=['tkmet','npv_tkmet','closest_tkmet','puppimet','invpuppimet','gen_tkmet','gen_tkmet5']
+        self.metFlavours=['tkmet','npv_tkmet','closest_tkmet','puppimet','invpuppimet','gen_tkmet','gen_tkmet5','gen_allmet','gen_allmet5']
 
         print 'EventRecoilProducer',
         print 'Will use pT>{0} GeV and pvFlags>={1}'.format(self.ptThr,self.pvflag),
@@ -114,18 +114,24 @@ class EventRecoilProducer(Analyzer):
 
         return toReturn
 
-    def processGen(self,event,etacut=2.4):
+    def processGen(self,event,etacut=2.4,ptcut=-1,includeNeutrals=False):
 
         """makes a charged-based gen recoil estimator"""
 
+        if ptcut < 0:
+            ptcut = self.ptThr
+        
         #loop over final state particles
         pMom=[]
         try:
             nlep=0
             for p in self.mchandles['packedGen'].product():
-                if p.charge() == 0: continue
+                if not includeNeutrals and p.charge() == 0:
+                    continue
+                if abs(p.pdgId()) in [12,14,16]: #veto neutrinos
+                    continue
                 if p.status() != 1: continue
-                if p.pt()<self.ptThr or abs(p.eta())>etacut : continue
+                if p.pt()<ptcut or abs(p.eta())>etacut : continue
 
                 #veto up to two high pT central, leptons
                 if abs(p.pdgId()) in [11,13] and p.pt()>20 and abs(p.eta())<etacut:
@@ -146,7 +152,9 @@ class EventRecoilProducer(Analyzer):
 
         #gen level
         genMom=self.processGen(event)
-        genMom5=self.processGen(event, 5.)
+        genMom5=self.processGen(event, etacut=5.)
+        genMomAll=self.processGen(event, includeNeutrals=True)
+        genMomAll5=self.processGen(event, etacut=6., ptcut=0., includeNeutrals=True)
 
         #vertex analysis
         mindz=9999.
@@ -263,6 +271,10 @@ class EventRecoilProducer(Analyzer):
                 selPF=genMom
             elif m=='gen_tkmet5':
                 selPF=genMom5
+            elif m=='gen_allmet':
+                selPF=genMomAll
+            elif m=='gen_allmet5':
+                selPF=genMomAll5
             else:
                 mfilter=(pfTags[:,im]==True)
                 selPF=pfMom[mfilter] 
@@ -280,6 +292,7 @@ class EventRecoilProducer(Analyzer):
                     selCov=selCov[ptfilter]
                             
             #basic kinematics
+            sig = 0
             if len(selPF)>0:
                 recx,recy,recz,ht,_=np.sum(selPF,axis=0,dtype=np.float32)
                 recpt=np.hypot(recx,recy)
