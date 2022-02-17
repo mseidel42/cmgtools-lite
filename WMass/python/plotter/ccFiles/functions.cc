@@ -174,6 +174,26 @@ float invMLepPhotons(const Vec_f& pt1, const Vec_f& eta1, const Vec_f& phi1, flo
   return psum.mass();
 }
 
+float pt2ijk(const Vec_f& pt_i, const Vec_f& eta_i, const Vec_f& phi_i, float m_i, const Vec_f& pt_j, const Vec_f& eta_j, const Vec_f& phi_j, float m_j, const Vec_f& pt_k, const Vec_f& eta_k, const Vec_f& phi_k, float m_k) {
+  // PtEtaPhiMVector p1(pt1[0], eta1[0], phi1[0], m1);
+  PtEtaPhiMVector p_i(0,0,0,0);
+  for (unsigned int i = 0; i < pt_i.size(); ++i) {
+    PtEtaPhiMVector ptemp(pt_i[i], eta_i[i], phi_i[i], m_i);
+    p_i += ptemp;
+  }
+  PtEtaPhiMVector p_j(0,0,0,0);
+  for (unsigned int i = 0; i < pt_j.size(); ++i) {
+    PtEtaPhiMVector ptemp(pt_j[i], eta_j[i], phi_j[i], m_j);
+    p_j += ptemp;
+  }
+  PtEtaPhiMVector p_k(0,0,0,0);
+  for (unsigned int i = 0; i < pt_k.size(); ++i) {
+    PtEtaPhiMVector ptemp(pt_k[i], eta_k[i], phi_k[i], m_k);
+    p_k += ptemp;
+  }
+  return 2*(p_i.Dot(p_j))*(p_j.Dot(p_k))/(p_i.Dot(p_j) + p_j.Dot(p_k) + p_i.Dot(p_k));
+}
+
 float rapidity(const Vec_f& pt, const Vec_f& eta, const Vec_f& phi, const Vec_f& m) {
   //typedef ROOT::Math::LorentzVector<ROOT::Math::PtEtaPhiM4D<double> > PtEtaPhiMVector;
   PtEtaPhiMVector p1(pt[0], eta[0], phi[0], m[0]);;

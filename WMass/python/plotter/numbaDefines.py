@@ -144,13 +144,15 @@ def prefsrLeptons(status, statusFlags, pdgId, motherIdx, pts):
 def ewPhotonKinematicsSel(status, statusFlags, pdgId, motherIdx, pts, etas, phis, withISR = False):
     isLepton = (np.abs(pdgId) >= 11) & (np.abs(pdgId) <= 14) & (motherIdx >= 0)
     isMuon = isLepton & (np.abs(pdgId) == 13)
+    isMuonNu = isLepton & (np.abs(pdgId) == 14)
     isPhoton = pdgId == 22
     status1 = status == 1
     isPrompt = ((statusFlags >> 0 ) & 1).astype(np.bool_)
     isHardProcess = ((statusFlags >> 8 ) & 1).astype(np.bool_)
 
-    leptons = isMuon & status1 & isPrompt & isHardProcess
+    leptons = (isMuon | isMuonNu) & status1 & isPrompt & isHardProcess
     photons = isPhoton & status1 & isPrompt
+    # TODO: handle pair production?
     if not withISR:
         motherV = (pdgId[motherIdx] == 23) | (np.abs(pdgId[motherIdx]) == 24)
         leptons = leptons & motherV

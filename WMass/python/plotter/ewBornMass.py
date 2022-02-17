@@ -30,8 +30,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--input",  type=str, default='minnlo', help="File to read histos from")
 parser.add_argument("-b", "--boson", type=str, default='Z', help="boson")
-parser.add_argument("-m", "--maxFiles", type=int, default=500, help="Maximum number of files")
-parser.add_argument("-w", "--withISR", type=bool, default=True, help="Consider ISR photons")
+parser.add_argument("-m", "--maxFiles", type=int, default=50, help="Maximum number of files")
 parser.add_argument('--snapshot', action='store_true')
 parser.add_argument('--binning', action='store_true')
 parser.add_argument('-z', '--deleteZombies', action='store_true')
@@ -96,35 +95,26 @@ def makePlot(name):
                 nFilesAdded += 1
     print('Added %i files' % nFilesAdded)
 
-    if args.withISR:
-        name = name + "_withISR"
-
     rdf = ROOT.RDataFrame(chain)
-    # rdf = ROOT.RDataFrame('Events', '/afs/cern.ch/work/m/mseidel/WMass/MC/CMSSW_10_6_19_patch2/src/Configuration/WMassNanoGen/NanoGen.root')
     rdf = rdf.Define('genPrefsrLeps', 'Numba::prefsrLeptons(GenPart_status, GenPart_statusFlags, GenPart_pdgId, GenPart_genPartIdxMother, GenPart_pt)')
     rdf = rdf.Define('ptVgen', 'transversemomentum(GenPart_pt[genPrefsrLeps],GenPart_phi[genPrefsrLeps])')
-    rdf = rdf.Define('rapVgen', 'rapidity(GenPart_pt[genPrefsrLeps],GenPart_phi[genPrefsrLeps],GenPart_phi[genPrefsrLeps],GenPart_mass[genPrefsrLeps])')
-    rdf = rdf.Define('massVgen', 'invariantmass(GenPart_pt[genPrefsrLeps],GenPart_phi[genPrefsrLeps],GenPart_phi[genPrefsrLeps],GenPart_mass[genPrefsrLeps])')
-    rdf = rdf.Define('ewSel', 'Numba::ewPhotonKinematicsSel(GenPart_status, GenPart_statusFlags, GenPart_pdgId, GenPart_genPartIdxMother, GenPart_pt, GenPart_eta, GenPart_phi, %s)' % str(args.withISR).lower())
-    rdf = rdf.Define('sij', 'log10(invMLepPhotons(GenPart_pt[ewSel==1],GenPart_eta[ewSel==1],GenPart_phi[ewSel==1],0.105658,GenPart_pt[ewSel==3],GenPart_eta[ewSel==3],GenPart_phi[ewSel==3]))')
-    rdf = rdf.Define('sik', '(invMLepPhotons(GenPart_pt[ewSel==1|ewSel==2],GenPart_eta[ewSel==1|ewSel==2],GenPart_phi[ewSel==1|ewSel==2],0.105658, GenPart_pt[ewSel==99],GenPart_eta[ewSel==99],GenPart_phi[ewSel==99]))')
-    rdf = rdf.Define('sjk', 'log10(invMLepPhotons(GenPart_pt[ewSel==2],GenPart_eta[ewSel==2],GenPart_phi[ewSel==2],0.105658,GenPart_pt[ewSel==3],GenPart_eta[ewSel==3],GenPart_phi[ewSel==3]))')
-    rdf = rdf.Define('sijk', '(invMLepPhotons(GenPart_pt[ewSel==1|ewSel==2],GenPart_eta[ewSel==1|ewSel==2],GenPart_phi[ewSel==1|ewSel==2],0.105658, GenPart_pt[ewSel==3],GenPart_eta[ewSel==3],GenPart_phi[ewSel==3]))')
-    rdf = rdf.Define('logMassDiff', 'log10(sijk-sik+1e-5)')
-    rdf = rdf.Define('pt2ijk', 'pt2ijk(GenPart_pt[ewSel==1],GenPart_eta[ewSel==1],GenPart_phi[ewSel==1],0.105658, GenPart_pt[ewSel==3],GenPart_eta[ewSel==3],GenPart_phi[ewSel==3],0., GenPart_pt[ewSel==2],GenPart_eta[ewSel==2],GenPart_phi[ewSel==2],0.105658)')
+    rdf = rdf.Define('rapVgen', 'abs(rapidity(GenPart_pt[genPrefsrLeps],GenPart_eta[genPrefsrLeps],GenPart_phi[genPrefsrLeps],GenPart_mass[genPrefsrLeps]))')
+    rdf = rdf.Define('massVgen', 'invariantmass(GenPart_pt[genPrefsrLeps],GenPart_eta[genPrefsrLeps],GenPart_phi[genPrefsrLeps],GenPart_mass[genPrefsrLeps])')
 
     if args.snapshot:
-        rdf.Snapshot('Events', 'snapshot_%s.root' % name, ['ptVgen', 'ewSel', 'nGenPart', 'GenPart_pdgId', 'GenPart_status', 'GenPart_statusFlags', 'GenPart_genPartIdxMother', 'GenPart_pt', 'GenPart_eta', 'GenPart_phi', 'sij', 'sik', 'sjk', 'sijk', 'pt2ijk'])
-
-    # hist = rdf.Histo2D((name, ';log_{10} s(#mu- #sum #gamma);log_{10} s(#mu+ #sum #gamma)', 100, -1.5, 3.5, 100, -1.5, 3.5), 'sij', 'sjk')
+        rdf.Snapshot('Events', 'snapshot_%s.root' % name, ['ptVgen', 'ewSel', 'nGenPart', 'GenPart_pdgId', 'GenPart_status', 'GenPart_statusFlags', 'GenPart_genPartIdxMother', 'GenPart_pt', 'GenPart_eta', 'GenPart_phi', 'ptVgen', 'rapVgen', 'massVgen'])
 
     if args.boson == 'Z':
-        massBins = makeBinning(mass = 91.1535, width = 2.4932, initialStep=0.010)
+        massBins = makeBinning(mass = 91.1535, width = 2.4932, initialStep=0.10)
     else:
-        massBins = makeBinning(mass = 80.3815, width = 2.0904, initialStep=0.010)
-    massDiffBins = np.linspace(-5, 5, 101)
-    hmodel = ROOT.RDF.TH2DModel(name, ';M(#mu+ #mu-) [GeV];log_{10} #{}{ M(#mu+ #mu- #sum #gamma) - M(#mu+ #mu-) + 10^{-5} } [GeV]', len(massBins)-1, array('d', massBins), len(massDiffBins)-1, array('d', massDiffBins))
-    hist = rdf.Histo2D(hmodel, 'sik', 'logMassDiff')
+        massBins = makeBinning(mass = 80.3815, width = 2.0904, initialStep=0.10)
+    ptBins = np.logspace(-1,3,9)
+    ptModel = ROOT.RDF.TH2DModel(name+'_pt', ';Boson mass [GeV];Boson p_{T} [GeV]', len(massBins)-1, array('d', massBins), len(ptBins)-1, array('d', ptBins))
+    ptHist = rdf.Histo2D(ptModel, 'massVgen', 'ptVgen')
+    
+    rapBins = np.linspace(0, 5, 11)
+    rapModel = ROOT.RDF.TH2DModel(name+'_rap', ';Boson mass [GeV];Boson rapidity', len(massBins)-1, array('d', massBins), len(rapBins)-1, array('d', rapBins))
+    rapHist = rdf.Histo2D(rapModel, 'massVgen', 'rapVgen')
 
     c = ROOT.TCanvas('c','c',500,500)
     c.cd()
@@ -134,19 +124,36 @@ def makePlot(name):
     c.SetTopMargin(0.05)
     c.SetLogz()
     c.cd()
+    if not os.path.isdir('plots/ewBornMass/%s/' % args.boson):
+        os.makedirs('plots/ewBornMass/%s/' % args.boson)
 
-    hist.Draw('colz')
+    c.SetLogy(True)
+    ptHist.Draw('colz')
     c.Update()
     
-    st = hist.FindObject('stats')
+    st = ptHist.FindObject('stats')
     st.SetX1NDC(0.60)
     st.SetX2NDC(0.87)
     c.Modified()
     c.Update()
 
-    c.Print('plots/ewPhotonKinematics/%s/ewPK_%s.pdf'  % (args.boson, name))
-    c.Print('plots/ewPhotonKinematics/%s/ewPK_%s.png'  % (args.boson, name))
-    c.Print('plots/ewPhotonKinematics/%s/ewPK_%s.root' % (args.boson, name))
+    c.Print('plots/ewBornMass/%s/mass_pt_%s.pdf'  % (args.boson, name))
+    c.Print('plots/ewBornMass/%s/mass_pt_%s.png'  % (args.boson, name))
+    c.Print('plots/ewBornMass/%s/mass_pt_%s.root' % (args.boson, name))
+    
+    c.SetLogy(False)
+    rapHist.Draw('colz')
+    c.Update()
+    
+    st = rapHist.FindObject('stats')
+    st.SetX1NDC(0.60)
+    st.SetX2NDC(0.87)
+    c.Modified()
+    c.Update()
+
+    c.Print('plots/ewBornMass/%s/mass_rap_%s.pdf'  % (args.boson, name))
+    c.Print('plots/ewBornMass/%s/mass_rap_%s.png'  % (args.boson, name))
+    c.Print('plots/ewBornMass/%s/mass_rap_%s.root' % (args.boson, name))
 
 baseNano = '/eos/cms/store/cmst3/group/wmass/w-mass-13TeV/NanoAOD/'
 baseNanoGen = '/eos/cms/store/cmst3/group/wmass/w-mass-13TeV/NanoGen/'
@@ -154,25 +161,14 @@ paths = {}
 paths['Z'] = {
     'minnlo': baseNano+'DYJetsToMuMu_M-50_TuneCP5_13TeV-powhegMiNNLO-pythia8-photos/NanoV8MC*VFP/210319_*/*/',
     'horace-photos': baseNanoGen+'ZToMuMu_TuneCP5_13TeV-horace-born-fsr-photos-isr-pythia/',
-    'horace-pythia': baseNanoGen+'ZToMuMu_TuneCP5_13TeV-horace-born-fsr-pythia-isr-pythia/',
-    'horace-exp': baseNanoGen+'ZToMuMu_TuneCP5_13TeV-horace-exp-fsr-off-isr-off/',
-    'horace-exp-old': baseNanoGen+'ZToMuMu_TuneCP5_13TeV-horace-exp-old-fsr-off-isr-pythia/',
-    'horace-alpha-old': baseNanoGen+'ZToMuMu_TuneCP5_13TeV-horace-alpha-old-fsr-off-isr-pythia/',
-    'horace-photoslow': baseNanoGen+'ZToMuMu_TuneCP5_13TeV-horace-born-fsr-photoslow-isr-pythia/',
-    'horace-photosnopair': baseNanoGen+'ZToMuMu_TuneCP5_13TeV-horace-born-fsr-photosnopair-isr-pythia/',
 }
 paths['Wplus'] = {
     'minnlo': baseNano+'WplusJetsToMuNu_TuneCP5_13TeV-powhegMiNNLO-pythia8-photos/MC*VFPWeightFix/210701_234251/*/',
-    # 'horace-photosnopair': baseNanoGen+'WplusToMuNu_TuneCP5_13TeV-horace-born-fsr-photosnopair-isr-pythia',
     'horace-photos': baseNanoGen+'WplusToMuNu_TuneCP5_13TeV-horace-born-fsr-photos-isr-pythia',
-    'horace-exp': baseNanoGen+'WplusToMuNu_TuneCP5_13TeV-horace-exp-fsr-off-isr-off',
-    'horace-exp-old': baseNanoGen+'WplusToMuNu_TuneCP5_13TeV-horace-exp-old-fsr-off-isr-pythia',
 }
 paths['Wminus'] = {
     'minnlo': baseNano+'WminusJetsToMuNu_TuneCP5_13TeV-powhegMiNNLO-pythia8-photos/MC*VFPWeightFix/210701_234131/*/',
     'horace-photos': baseNanoGen+'WminusToMuNu_TuneCP5_13TeV-horace-born-fsr-photos-isr-pythia',
-    'horace-exp': baseNanoGen+'WminusToMuNu_TuneCP5_13TeV-horace-exp-fsr-off-isr-off',
-    'horace-exp-old': baseNanoGen+'WminusToMuNu_TuneCP5_13TeV-horace-exp-old-fsr-off-isr-pythia',
 }
 
 
